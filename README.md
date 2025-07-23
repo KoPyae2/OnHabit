@@ -2,7 +2,7 @@
 
 A minimalist habit tracker designed for individuals and couples. Build consistency through daily check-ins, streak tracking, and partner synchronization.
 
-![OneHabit Banner](https://via.placeholder.com/800x400/22c55e/ffffff?text=OneHabit+-+Build+Habits+Together)
+![OneHabit Banner](https://github.com/KoPyae2/OnHabit/blob/master/public/screenshoot.png)
 
 ## ✨ Features
 
