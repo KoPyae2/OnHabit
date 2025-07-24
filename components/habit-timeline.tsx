@@ -4,9 +4,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { Id } from "@/convex/_generated/dataModel";
-import { ChevronLeft, ChevronRight, Calendar, Flame, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { ChevronLeft, ChevronRight, Calendar, Flame, TrendingUp, BarChart3, Sparkles, Link2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { DayDetailModal } from "@/components/day-detail-modal";
+import { HabitAnalytics } from "@/components/habit-analytics";
 
 interface HabitTimelineProps {
   userId: Id<"users">;
@@ -15,6 +19,9 @@ interface HabitTimelineProps {
 
 export function HabitTimeline({ userId, habits }: HabitTimelineProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState("calendar");
+  const [monthTransition, setMonthTransition] = useState<'left' | 'right' | null>(null);
   
   // Get current month's check-ins
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -62,15 +69,21 @@ export function HabitTimeline({ userId, habits }: HabitTimelineProps) {
   const calendarDays = generateCalendarDays();
   
   const navigateMonth = (direction: 'prev' | 'next') => {
-    setCurrentDate(prev => {
-      const newDate = new Date(prev);
-      if (direction === 'prev') {
-        newDate.setMonth(newDate.getMonth() - 1);
-      } else {
-        newDate.setMonth(newDate.getMonth() + 1);
-      }
-      return newDate;
-    });
+    setMonthTransition(direction === 'prev' ? 'left' : 'right');
+    
+    setTimeout(() => {
+      setCurrentDate(prev => {
+        const newDate = new Date(prev);
+        if (direction === 'prev') {
+          newDate.setMonth(newDate.getMonth() - 1);
+        } else {
+          newDate.setMonth(newDate.getMonth() + 1);
+        }
+        return newDate;
+      });
+      
+      setTimeout(() => setMonthTransition(null), 50);
+    }, 150);
   };
 
   const getDayCheckins = (date: Date) => {
@@ -92,9 +105,15 @@ export function HabitTimeline({ userId, habits }: HabitTimelineProps) {
     });
   };
 
-  // Calculate month statistics
+  // Calculate month statistics with streaks
   const getMonthStats = () => {
-    if (!monthCheckins || habits.length === 0) return { perfectDays: 0, totalCompletion: 0 };
+    if (!monthCheckins || habits.length === 0) return { 
+      perfectDays: 0, 
+      totalCompletion: 0, 
+      currentStreak: 0, 
+      longestStreak: 0,
+      streakBroken: false 
+    };
     
     const daysInMonth = monthEnd.getDate();
     const checkinsByDate = monthCheckins.reduce((acc, checkin) => {
@@ -106,24 +125,44 @@ export function HabitTimeline({ userId, habits }: HabitTimelineProps) {
     let perfectDays = 0;
     let totalPossibleCheckins = 0;
     let totalCompletedCheckins = 0;
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    let streakBroken = false;
     
+    // Calculate stats and streaks
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
       const dateStr = formatDate(date);
       const dayCheckins = checkinsByDate[dateStr] || [];
       const completedCount = dayCheckins.filter(c => c.checked).length;
+      const isPerfectDay = completedCount === habits.length && habits.length > 0;
       
       totalPossibleCheckins += habits.length;
       totalCompletedCheckins += completedCount;
       
-      if (completedCount === habits.length && habits.length > 0) {
+      if (isPerfectDay) {
         perfectDays++;
+        tempStreak++;
+        longestStreak = Math.max(longestStreak, tempStreak);
+      } else {
+        if (tempStreak > 0) streakBroken = true;
+        tempStreak = 0;
       }
     }
     
+    // Current streak is the temp streak if we're still in it
+    currentStreak = tempStreak;
+    
     const totalCompletion = totalPossibleCheckins > 0 ? (totalCompletedCheckins / totalPossibleCheckins) * 100 : 0;
     
-    return { perfectDays, totalCompletion: Math.round(totalCompletion) };
+    return { 
+      perfectDays, 
+      totalCompletion: Math.round(totalCompletion),
+      currentStreak,
+      longestStreak,
+      streakBroken: streakBroken && currentStreak === 0
+    };
   };
 
   const monthStats = getMonthStats();
@@ -137,194 +176,237 @@ export function HabitTimeline({ userId, habits }: HabitTimelineProps) {
   const weekDaysFull = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="w-full space-y-4">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center space-x-2">
-              <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+    <div className="w-full space-y-6">
+      {/* Streak Status Alert */}
+      {monthStats.streakBroken && (
+        <Card className="bg-gradient-to-r from-red-50 to-orange-50 border-red-200 bounce-in">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">💔</div>
               <div>
-                <p className="text-xs sm:text-sm text-orange-600 font-medium">Perfect Days</p>
-                <p className="text-xl sm:text-2xl font-bold text-orange-700">{monthStats.perfectDays}</p>
+                <p className="font-semibold text-red-800">🔥 Streak Lost</p>
+                <p className="text-sm text-red-600">Your perfect day streak was broken. Start a new one today!</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-              <div>
-                <p className="text-xs sm:text-sm text-green-600 font-medium">Completion</p>
-                <p className="text-xl sm:text-2xl font-bold text-green-700">{monthStats.totalCompletion}%</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
-      {/* Calendar Card */}
-      <Card className="w-full">
-        <CardHeader className="pb-3 sm:pb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="hidden sm:inline">Habit Timeline</span>
-                <span className="sm:hidden">Timeline</span>
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Track your progress over time
-              </CardDescription>
+      {/* Tabs for Calendar and Analytics */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calendar" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Calendar View</span>
+            <span className="sm:hidden">Calendar</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Analytics</span>
+            <span className="sm:hidden">Stats</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar" className="space-y-4 mt-6">
+
+        {/* Calendar Card */}
+        <Card className="w-full">
+          <CardHeader className="pb-3 sm:pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Habit Timeline</span>
+                  <span className="sm:hidden">Timeline</span>
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Click on any day to see details
+                </CardDescription>
+              </div>
+              <div className="flex items-center space-x-1 sm:space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateMonth('prev')}
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-9 hover:bg-gray-100 transition-all duration-200"
+                >
+                  <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+                <span className="text-xs sm:text-sm font-semibold min-w-[90px] sm:min-w-[120px] text-center">
+                  <span className="hidden sm:inline">{monthNames[currentDate.getMonth()]}</span>
+                  <span className="sm:hidden">{monthNames[currentDate.getMonth()].slice(0, 3)}</span>
+                  {' '}{currentDate.getFullYear()}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigateMonth('next')}
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-9 hover:bg-gray-100 transition-all duration-200"
+                >
+                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center space-x-1 sm:space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateMonth('prev')}
-                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-              >
-                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-              <span className="text-xs sm:text-sm font-semibold min-w-[90px] sm:min-w-[120px] text-center">
-                <span className="hidden sm:inline">{monthNames[currentDate.getMonth()]}</span>
-                <span className="sm:hidden">{monthNames[currentDate.getMonth()].slice(0, 3)}</span>
-                {' '}{currentDate.getFullYear()}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigateMonth('next')}
-                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
-              >
-                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="p-3 sm:p-6">
-          <div className="space-y-3 sm:space-y-4">
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
-              {/* Week day headers */}
-              {weekDays.map((day, index) => (
-                <div key={`weekday-${index}`} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-semibold text-gray-600">
-                  <span className="sm:hidden">{day}</span>
-                  <span className="hidden sm:inline">{weekDaysFull[index]}</span>
-                </div>
-              ))}
-              
-              {/* Calendar days */}
-              {calendarDays.map((day, index) => {
-                const dayCheckins = getDayCheckins(day.date);
-                const completedCount = dayCheckins.filter(c => c.completed).length;
-                const totalHabits = habits.length;
-                const completionRate = totalHabits > 0 ? completedCount / totalHabits : 0;
-                const isToday = formatDate(day.date) === formatDate(new Date());
-                const isPerfectDay = completionRate === 1 && totalHabits > 0;
-                
-                return (
-                  <div
-                    key={index}
-                    className={`
-                      relative p-1 sm:p-2 min-h-[45px] sm:min-h-[70px] border rounded-lg transition-all duration-200
-                      ${day.isCurrentMonth 
-                        ? 'bg-white hover:bg-gray-50 border-gray-200' 
-                        : 'bg-gray-50 border-gray-100 text-gray-400'
-                      }
-                      ${isToday ? 'ring-2 ring-blue-400 shadow-md' : ''}
-                      ${isPerfectDay ? 'bg-gradient-to-br from-green-50 to-green-100' : ''}
-                    `}
-                  >
-                    {/* Date number */}
-                    <div className={`text-xs sm:text-sm font-semibold ${
-                      isToday ? 'text-blue-600' : 
-                      day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
-                    }`}>
-                      {day.date.getDate()}
-                    </div>
-                    
-                    {/* Progress indicators for current month */}
-                    {day.isCurrentMonth && totalHabits > 0 && (
-                      <div className="mt-1 space-y-1">
-                        {/* Progress bar */}
-                        <div className="w-full bg-gray-200 rounded-full h-1 sm:h-1.5">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              completionRate === 1 ? 'bg-green-500 shadow-sm' :
-                              completionRate >= 0.7 ? 'bg-yellow-500' :
-                              completionRate >= 0.4 ? 'bg-orange-500' :
-                              completionRate > 0 ? 'bg-red-400' : 'bg-gray-200'
-                            }`}
-                            style={{ width: `${completionRate * 100}%` }}
-                          />
-                        </div>
-                        
-                        {/* Habit dots - only show on larger screens */}
-                        <div className="hidden sm:flex flex-wrap gap-0.5">
-                          {dayCheckins.slice(0, 6).map((checkin, i) => (
-                            <div
-                              key={i}
-                              className={`w-2 h-2 rounded-full transition-colors ${
-                                checkin.completed ? 'bg-green-500 shadow-sm' : 'bg-gray-300'
-                              }`}
-                              title={`${checkin.habitTitle}: ${checkin.completed ? 'Completed' : 'Not completed'}`}
-                            />
-                          ))}
-                          {dayCheckins.length > 6 && (
-                            <div className="text-[10px] text-gray-500 flex items-center">
-                              +{dayCheckins.length - 6}
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Mobile completion indicator */}
-                        <div className="sm:hidden flex justify-center">
-                          {completedCount > 0 && (
-                            <div className="text-[10px] font-medium text-gray-600">
-                              {completedCount}/{totalHabits}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Perfect day flame */}
-                    {isPerfectDay && (
-                      <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 absolute top-1 right-1 animate-pulse" />
-                    )}
+          </CardHeader>
+          
+          <CardContent className="p-3 sm:p-6">
+            <div className="space-y-3 sm:space-y-4">
+              {/* Calendar Grid */}
+              <div className={`grid grid-cols-7 gap-1 sm:gap-2 ${
+                monthTransition === 'left' ? 'calendar-slide-in-left' : 
+                monthTransition === 'right' ? 'calendar-slide-in-right' : ''
+              }`}>
+                {/* Week day headers */}
+                {weekDays.map((day, index) => (
+                  <div key={`weekday-${index}`} className="p-1 sm:p-2 text-center text-xs sm:text-sm font-semibold text-gray-600">
+                    <span className="sm:hidden">{day}</span>
+                    <span className="hidden sm:inline">{weekDaysFull[index]}</span>
                   </div>
-                );
-              })}
+                ))}
+                
+                {/* Calendar days */}
+                {calendarDays.map((day, index) => {
+                  const dayCheckins = getDayCheckins(day.date);
+                  const completedCount = dayCheckins.filter(c => c.completed).length;
+                  const totalHabits = habits.length;
+                  const completionRate = totalHabits > 0 ? completedCount / totalHabits : 0;
+                  const isToday = formatDate(day.date) === formatDate(new Date());
+                  const isPerfectDay = completionRate === 1 && totalHabits > 0;
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => day.isCurrentMonth && setSelectedDay(day.date)}
+                      className={`
+                        calendar-cell relative p-1 sm:p-2 min-h-[45px] sm:min-h-[70px] border rounded-lg transition-all duration-300 transform group
+                        ${day.isCurrentMonth 
+                          ? 'bg-white hover:bg-gray-50 border-gray-200 hover:shadow-lg hover:scale-105 cursor-pointer button-hover-lift' 
+                          : 'bg-gray-50 border-gray-100 text-gray-400 cursor-default'
+                        }
+                        ${isToday ? 'ring-2 ring-blue-400 shadow-md today-pulse' : ''}
+                        ${isPerfectDay ? 'bg-gradient-to-br from-green-50 to-green-100 shadow-green-100/50 perfect-day-glow' : ''}
+                      `}
+                      disabled={!day.isCurrentMonth}
+                    >
+                      {/* Date number with better visibility */}
+                      <div className={`text-sm sm:text-base font-bold ${
+                        isToday ? 'text-blue-600' : 
+                        day.isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      }`}>
+                        {day.date.getDate()}
+                        {isToday && <div className="w-1 h-1 bg-blue-500 rounded-full mx-auto mt-1"></div>}
+                      </div>
+                      
+                      {/* Progress indicators for current month */}
+                      {day.isCurrentMonth && totalHabits > 0 && (
+                        <div className="mt-1 space-y-1">
+                          {/* Enhanced progress bar with gradient */}
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 sm:h-2 shadow-inner overflow-hidden">
+                            <div
+                              className={`h-full rounded-full progress-bar-animated ${
+                                completionRate === 1 ? 'bg-gradient-to-r from-green-400 to-green-500 shadow-lg' :
+                                completionRate >= 0.7 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 shadow-md' :
+                                completionRate >= 0.4 ? 'bg-gradient-to-r from-orange-400 to-orange-500 shadow-md' :
+                                completionRate > 0 ? 'bg-gradient-to-r from-red-400 to-red-500 shadow-md' : 'bg-gray-200'
+                              }`}
+                              style={{ 
+                                '--progress-width': `${completionRate * 100}%`,
+                                width: `${completionRate * 100}%`,
+                                transform: completionRate > 0 ? 'scale(1.05)' : 'scale(1)'
+                              } as React.CSSProperties}
+                            />
+                          </div>
+                          
+                          {/* Habit dots - enhanced with better visibility */}
+                          <div className="hidden sm:flex flex-wrap gap-0.5 justify-center">
+                            {dayCheckins.slice(0, 6).map((checkin, i) => (
+                              <div
+                                key={i}
+                                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                                  checkin.completed 
+                                    ? 'bg-green-500 shadow-lg transform scale-110' 
+                                    : 'bg-gray-300 hover:bg-gray-400'
+                                }`}
+                                title={`${checkin.habitTitle}: ${checkin.completed ? 'Completed' : 'Not completed'}`}
+                              />
+                            ))}
+                            {dayCheckins.length > 6 && (
+                              <div className="text-[10px] text-gray-500 flex items-center font-medium">
+                                +{dayCheckins.length - 6}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Mobile completion indicator with better styling */}
+                          <div className="sm:hidden flex justify-center">
+                            {completedCount > 0 && (
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4">
+                                {completedCount}/{totalHabits}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Perfect day flame with enhanced animation */}
+                      {isPerfectDay && (
+                        <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500 absolute top-1 right-1 animate-bounce drop-shadow-lg" />
+                      )}
+                    </button>
+                  );
+                })}
             </div>
             
-            {/* Legend */}
-            <div className="pt-3 sm:pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-center gap-2 sm:gap-6 text-xs text-gray-600">
-                <div className="flex items-center space-x-1.5">
-                  <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm" />
-                  <span>All completed</span>
+            {/* Enhanced Legend */}
+            <div className="pt-4 border-t border-gray-100">
+              <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-center gap-3 sm:gap-6 text-xs text-gray-600">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-500 rounded-full shadow-lg" />
+                  <span className="font-medium">All completed</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full" />
-                  <span>70%+ done</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full shadow-md" />
+                  <span className="font-medium">70%+ done</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <div className="w-3 h-3 bg-orange-500 rounded-full" />
-                  <span>Some done</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gradient-to-r from-orange-400 to-orange-500 rounded-full shadow-md" />
+                  <span className="font-medium">Some done</span>
                 </div>
-                <div className="flex items-center space-x-1.5">
-                  <Flame className="h-3 w-3 text-orange-500" />
-                  <span>Perfect day</span>
+                <div className="flex items-center space-x-2">
+                  <Flame className="h-3 w-3 text-orange-500 animate-pulse" />
+                  <span className="font-medium">Perfect day</span>
                 </div>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+      </TabsContent>
+
+      <TabsContent value="analytics" className="mt-6">
+        <HabitAnalytics 
+          habits={habits} 
+          checkins={monthCheckins || []} 
+          currentDate={currentDate}
+        />
+      </TabsContent>
+    </Tabs>
+
+    {/* Day Detail Modal */}
+    {selectedDay && (
+      <DayDetailModal
+        isOpen={!!selectedDay}
+        onClose={() => setSelectedDay(null)}
+        date={selectedDay}
+        habits={habits}
+        checkins={monthCheckins || []}
+        userId={userId}
+        onUpdate={() => {
+          // Trigger a refetch of the month checkins
+          // This will be handled by Convex's reactivity
+        }}
+      />
+    )}
+  </div>
+);
 }

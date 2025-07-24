@@ -6,9 +6,27 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar } from "@/components/ui/avatar";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
-import { CheckCircle2, Circle, Heart, Meh, Frown, MessageSquare, Smile, Users, Sparkles, Star, ThumbsUp } from "lucide-react";
+import { CheckCircle2, Circle, Heart, Meh, Frown, MessageSquare, Smile, Users, Sparkles, Star, ThumbsUp, MoreVertical, Edit, Trash2, Clock, Target, Timer, Flame } from "lucide-react";
+import { HabitTimer } from "@/components/habit-timer";
+import { Confetti } from "@/components/confetti";
 
 interface HabitItemTodayProps {
   habit: {
@@ -28,13 +46,23 @@ interface HabitItemTodayProps {
 export function HabitItemToday({ habit, userId, todaysCheckins, coupleInfo, userInfo }: HabitItemTodayProps) {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showMoodInput, setShowMoodInput] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
   const [note, setNote] = useState("");
   const [selectedMood, setSelectedMood] = useState<"excellent" | "good" | "neutral" | "bad" | "terrible" | null>(null);
   const [loading, setLoading] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  
+  // Edit/Delete states
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editTitle, setEditTitle] = useState(habit.title || habit.name || "");
 
   const toggleCheckin = useMutation(api.checkins.toggleCheckin);
   const updateCheckinNote = useMutation(api.checkins.updateCheckinNote);
   const updateCheckinMood = useMutation(api.checkins.updateCheckinMood);
+  const updateHabit = useMutation(api.habits.updateHabit);
+  const deleteHabit = useMutation(api.habits.deleteHabit);
 
   // Find today's check-in for this habit
   const checkin = todaysCheckins?.find(c => c.habitId === habit._id && c.userId === userId);
@@ -56,6 +84,11 @@ export function HabitItemToday({ habit, userId, todaysCheckins, coupleInfo, user
       });
       
       if (!isCompleted) {
+        // Trigger celebration animation and confetti
+        setCelebrating(true);
+        setShowConfetti(true);
+        setTimeout(() => setCelebrating(false), 800);
+        
         // Habit completed
         if (hasPartnerCompleted) {
           toast.success("🎉 Sync Bonus! Both completed today!", {
@@ -158,57 +191,154 @@ export function HabitItemToday({ habit, userId, todaysCheckins, coupleInfo, user
     }
   };
 
+  const handleEditHabit = async () => {
+    if (!editTitle.trim()) {
+      toast.error("Habit title cannot be empty");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateHabit({
+        habitId: habit._id,
+        userId: userId,
+        title: editTitle.trim(),
+      });
+      
+      toast.success("Habit updated successfully! 🎉");
+      setShowEditDialog(false);
+    } catch (error) {
+      toast.error("Failed to update habit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteHabit = async () => {
+    setLoading(true);
+    try {
+      await deleteHabit({
+        habitId: habit._id,
+        userId: userId,
+      });
+      
+      toast.success("Habit deleted successfully");
+      setShowDeleteDialog(false);
+    } catch (error) {
+      toast.error("Failed to delete habit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if user can edit/delete this habit (only owner can)
+  const canEditDelete = habit.ownerId === userId;
+
   return (
-    <div 
-      className={`p-4 rounded-xl shadow-sm border card-hover transition-all duration-200 ${
-        isCompleted 
-          ? 'bg-green-50 border-green-200 ring-1 ring-green-200' 
-          : 'bg-white border-gray-200'
-      }`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex items-center flex-shrink-0">
-            {isCompleted ? (
-              <div className="text-xl">🟢</div>
-            ) : (
-              <div className="text-xl">⚪</div>
-            )}
-          </div>
+    <>
+      <Confetti active={showConfetti} onComplete={() => setShowConfetti(false)} />
+      <div 
+        className={`p-5 rounded-2xl shadow-md border transition-all duration-300 hover:shadow-lg ${
+          isCompleted 
+            ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-200 shadow-green-100/50' 
+            : 'bg-white border-gray-200 hover:border-gray-300'
+        } ${celebrating ? 'celebrate' : ''}`}
+      >
+      {/* Main Habit Info */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start gap-4 flex-1 min-w-0">
+          {/* Habit Details */}
           <div className="flex-1 min-w-0">
-            <h3 className={`font-semibold tracking-tight truncate ${
-              isCompleted ? 'text-green-700' : 'text-gray-900'
+            <h3 className={`text-lg font-bold tracking-tight mb-2 ${
+              isCompleted ? 'text-green-800' : 'text-gray-900'
             }`}>
               {habit.title || habit.name}
             </h3>
-            <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-              <span>{habit.streak || 0}-day streak</span>
-              <span>•</span>
-              <span>{isCompleted ? '100%' : '0%'} complete</span>
+            
+            {/* Habit Stats */}
+            <div className="space-y-2">
+              {/* Streak and Progress */}
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  <span className="font-semibold text-orange-600">{habit.streak || 0}</span>
+                  <span className="text-gray-600">day streak</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Target className="h-4 w-4 text-blue-500" />
+                  <span className={`font-semibold ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                    {isCompleted ? '100%' : '0%'}
+                  </span>
+                  <span className="text-gray-600">complete</span>
+                </div>
+              </div>
+              
+              {/* Mood Display */}
               {existingMood && (
-                <>
-                  <span>•</span>
-                  <div className="flex items-center gap-1">
-                    {getMoodIcon(existingMood)}
-                    <span className="capitalize">{existingMood}</span>
-                  </div>
-                </>
+                <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border ${getMoodColor(existingMood)}`}>
+                  <span>{getMoodEmoji(existingMood)}</span>
+                  <span className="capitalize">{existingMood}</span>
+                </div>
               )}
             </div>
           </div>
         </div>
         
-        <button
-          onClick={handleToggle}
-          disabled={loading}
-          className="flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 min-h-[44px] min-w-[44px]"
-        >
-          {isCompleted ? (
-            <CheckCircle2 className="h-7 w-7 text-green-500" />
-          ) : (
-            <Circle className="h-7 w-7 text-gray-400 hover:text-green-500" />
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Edit/Delete Menu - Only show for habit owner */}
+          {canEditDelete && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-gray-100 rounded-full"
+                >
+                  <MoreVertical className="h-4 w-4 text-gray-500" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditTitle(habit.title || habit.name || "");
+                    setShowEditDialog(true);
+                  }}
+                  className="cursor-pointer"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit habit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="cursor-pointer text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete habit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-        </button>
+
+          {/* Completion Toggle Button */}
+          <button
+            onClick={handleToggle}
+            disabled={loading}
+            className={`flex items-center justify-center transition-all duration-300 p-3 rounded-full disabled:opacity-50 min-h-[52px] min-w-[52px] ${
+              isCompleted 
+                ? 'bg-green-500 hover:bg-green-600 shadow-lg hover:shadow-xl transform hover:scale-105' 
+                : 'bg-gray-100 hover:bg-green-100 border-2 border-dashed border-gray-300 hover:border-green-400'
+            }`}
+          >
+            {loading ? (
+              <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
+            ) : isCompleted ? (
+              <CheckCircle2 className="h-6 w-6 text-white" />
+            ) : (
+              <Circle className="h-6 w-6 text-gray-400 hover:text-green-500" />
+            )}
+          </button>
+        </div>
       </div>
 
       
@@ -311,35 +441,74 @@ export function HabitItemToday({ habit, userId, todaysCheckins, coupleInfo, user
         </div>
       )}
 
-      {/* Action Buttons */}
-      {isCompleted && !showNoteInput && !showMoodInput && (
-        <div className="mt-4 flex gap-2">
-          <Button
-            onClick={() => {
-              setNote(existingNote);
-              setShowNoteInput(true);
-            }}
-            variant="ghost"
-            size="sm"
-            className="text-xs h-8 px-3"
-          >
-            <MessageSquare className="h-3 w-3 mr-1" />
-            {existingNote ? "Edit note" : "Add note"}
-          </Button>
-          <Button
-            onClick={() => {
-              setSelectedMood(existingMood as any);
-              setShowMoodInput(true);
-            }}
-            variant="ghost"
-            size="sm"
-            className="text-xs h-8 px-3"
-          >
-            <Smile className="h-3 w-3 mr-1" />
-            {existingMood ? "Change mood" : "Add mood"}
-          </Button>
+      {/* Timer Section */}
+      {showTimer && !isCompleted && (
+        <div className="mt-4 animate-slide-in">
+          <HabitTimer 
+            onComplete={handleToggle}
+            defaultMinutes={5}
+          />
         </div>
       )}
+
+      {/* Action Buttons - Mobile Optimized */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {/* Timer Button - Show for incomplete habits */}
+        {!isCompleted && !showTimer && (
+          <Button
+            onClick={() => setShowTimer(true)}
+            variant="outline"
+            size="sm"
+            className="text-xs h-9 px-3 border-blue-200 text-blue-600 hover:bg-blue-50 min-w-[44px]"
+          >
+            <Timer className="h-3 w-3 sm:mr-1" />
+            <span className="hidden sm:inline ml-1">Start Timer</span>
+          </Button>
+        )}
+        
+        {/* Hide Timer Button */}
+        {showTimer && (
+          <Button
+            onClick={() => setShowTimer(false)}
+            variant="ghost"
+            size="sm"
+            className="text-xs h-9 px-3 min-w-[44px]"
+          >
+            <span className="sm:hidden">Hide</span>
+            <span className="hidden sm:inline">Hide Timer</span>
+          </Button>
+        )}
+
+        {/* Note and Mood buttons - Show for completed habits */}
+        {isCompleted && !showNoteInput && !showMoodInput && (
+          <>
+            <Button
+              onClick={() => {
+                setNote(existingNote);
+                setShowNoteInput(true);
+              }}
+              variant="ghost"
+              size="sm"
+              className="text-xs h-9 px-3 min-w-[44px]"
+            >
+              <MessageSquare className="h-3 w-3 sm:mr-1" />
+              <span className="hidden sm:inline ml-1">{existingNote ? "Edit note" : "Add note"}</span>
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedMood(existingMood as any);
+                setShowMoodInput(true);
+              }}
+              variant="ghost"
+              size="sm"
+              className="text-xs h-9 px-3 min-w-[44px]"
+            >
+              <Smile className="h-3 w-3 sm:mr-1" />
+              <span className="hidden sm:inline ml-1">{existingMood ? "Change mood" : "Add mood"}</span>
+            </Button>
+          </>
+        )}
+      </div>
 
       {/* Note Input */}
       {showNoteInput && (
@@ -459,6 +628,81 @@ export function HabitItemToday({ habit, userId, todaysCheckins, coupleInfo, user
           </div>
         </div>
       )}
-    </div>
+
+      {/* Edit Habit Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Habit</DialogTitle>
+            <DialogDescription>
+              Make changes to your habit. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="title" className="text-right">
+                Title
+              </Label>
+              <Input
+                id="title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="col-span-3"
+                placeholder="Enter habit title..."
+                maxLength={100}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleEditHabit}
+              disabled={loading || !editTitle.trim()}
+            >
+              {loading ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Habit Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Habit</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{habit.title || habit.name}"? This action cannot be undone and will remove all associated check-ins.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteHabit}
+              disabled={loading}
+            >
+              {loading ? "Deleting..." : "Delete habit"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      </div>
+    </>
   );
 }

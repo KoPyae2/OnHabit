@@ -11,6 +11,7 @@ export const toggleCheckin = mutation({
   args: {
     habitId: v.id("habits"),
     userId: v.id("users"),
+    date: v.optional(v.string()), // Add optional date parameter
     note: v.optional(v.string()),
     mood: v.optional(v.union(v.literal("excellent"), v.literal("good"), v.literal("neutral"), v.literal("bad"), v.literal("terrible"))),
     syncedWithPartner: v.optional(v.boolean()),
@@ -28,15 +29,15 @@ export const toggleCheckin = mutation({
     
     if (!canCheckIn) throw new Error("Not authorized to check-in for this habit");
 
-    const today = getTodayDate();
+    const targetDate = args.date || getTodayDate();
 
-    // Check if there's already a check-in for today
+    // Check if there's already a check-in for the target date
     const existingCheckin = await ctx.db
       .query("checkins")
       .withIndex("by_habit_user_date", (q) => 
         q.eq("habitId", args.habitId)
          .eq("userId", args.userId)
-         .eq("date", today)
+         .eq("date", targetDate)
       )
       .unique();
 
@@ -61,7 +62,7 @@ export const toggleCheckin = mutation({
       return await ctx.db.insert("checkins", {
         habitId: args.habitId,
         userId: args.userId,
-        date: today,
+        date: targetDate,
         checked: true,
         note: args.note || "",
         mood: args.mood,

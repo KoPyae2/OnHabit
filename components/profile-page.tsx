@@ -24,7 +24,9 @@ import {
   Award,
   LogOut,
   Upload,
-  Trash2
+  Trash2,
+  BarChart3,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
 import { signOut } from "next-auth/react";
@@ -199,9 +201,9 @@ export function ProfilePage({ userId }: ProfilePageProps) {
   return (
     <div className="space-y-8">
       {/* Profile Header */}
-      <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-white via-blue-50/30 to-purple-50/20">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5"></div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-200/20 to-purple-200/20 rounded-full -translate-y-16 translate-x-16"></div>
+      <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-white via-purple-50/30 to-pink-50/20 fade-in-up">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-200/20 to-pink-200/20 rounded-full -translate-y-16 translate-x-16"></div>
         
         <CardContent className="relative z-10 pt-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
@@ -222,7 +224,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
                     size="sm"
                     variant="outline"
                     disabled={uploadingPhoto}
-                    className="h-8 w-8 p-0 rounded-full bg-white shadow-md hover:bg-blue-50 cursor-pointer"
+                    className="h-8 w-8 p-0 rounded-full bg-white shadow-md hover:bg-purple-50 cursor-pointer button-hover-lift"
                     title="Upload photo"
                     asChild
                   >
@@ -230,7 +232,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
                       {uploadingPhoto ? (
                         <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600"></div>
                       ) : (
-                        <Upload className="h-3 w-3 text-blue-600" />
+                        <Upload className="h-3 w-3 text-purple-600" />
                       )}
                     </span>
                   </Button>
@@ -250,7 +252,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
                     size="sm"
                     variant="outline"
                     onClick={handleRemovePhoto}
-                    className="h-8 w-8 p-0 rounded-full bg-white shadow-md hover:bg-red-50"
+                    className="h-8 w-8 p-0 rounded-full bg-white shadow-md hover:bg-red-50 button-hover-lift"
                     title="Remove photo"
                   >
                     <Trash2 className="h-3 w-3 text-red-600" />
@@ -331,7 +333,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
             {/* Action Buttons */}
             <div className="flex gap-2">
               {!isEditing ? (
-                <Button onClick={handleEdit} variant="outline" className="gap-2">
+                <Button onClick={handleEdit} variant="outline" className="gap-2 button-hover-lift">
                   <Edit3 className="h-4 w-4" />
                   Edit Profile
                 </Button>
@@ -340,12 +342,12 @@ export function ProfilePage({ userId }: ProfilePageProps) {
                   <Button 
                     onClick={handleSave} 
                     disabled={loading}
-                    className="gap-2 bg-green-600 hover:bg-green-700"
+                    className="gap-2 bg-purple-600 hover:bg-purple-700 button-hover-lift"
                   >
                     <Save className="h-4 w-4" />
                     {loading ? "Saving..." : "Save"}
                   </Button>
-                  <Button onClick={handleCancel} variant="outline" className="gap-2">
+                  <Button onClick={handleCancel} variant="outline" className="gap-2 button-hover-lift">
                     <X className="h-4 w-4" />
                     Cancel
                   </Button>
@@ -359,7 +361,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
       {/* Statistics Cards */}
       {profileStats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card>
+          <Card className="card-hover fade-in-up stagger-1">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Target className="h-4 w-4 text-blue-600" />
@@ -372,7 +374,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-hover fade-in-up stagger-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Award className="h-4 w-4 text-green-600" />
@@ -385,7 +387,7 @@ export function ProfilePage({ userId }: ProfilePageProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-hover fade-in-up stagger-3">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Flame className="h-4 w-4 text-orange-600" />
@@ -393,12 +395,12 @@ export function ProfilePage({ userId }: ProfilePageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{profileStats.currentStreak}</div>
+              <div className={`text-2xl font-bold text-orange-600 ${profileStats.currentStreak > 0 ? 'streak-celebration' : ''}`}>{profileStats.currentStreak}</div>
               <p className="text-xs text-gray-500">Days in a row</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-hover fade-in-up stagger-4">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-purple-600" />
@@ -413,15 +415,200 @@ export function ProfilePage({ userId }: ProfilePageProps) {
         </div>
       )}
 
+      {/* Recent Activity & Achievements */}
+      {profileStats && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Achievements */}
+          <Card className="fade-in-up">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-yellow-600" />
+                Achievements
+              </CardTitle>
+              <CardDescription>
+                Your habit milestones and accomplishments
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Achievement badges */}
+                <div className="grid grid-cols-2 gap-3">
+                  {profileStats.totalHabits >= 5 && (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <p className="text-xs font-medium text-blue-800">Habit Builder</p>
+                        <p className="text-xs text-blue-600">5+ habits created</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {profileStats.totalCheckins >= 50 && (
+                    <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                      <Award className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-xs font-medium text-green-800">Consistent</p>
+                        <p className="text-xs text-green-600">50+ check-ins</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {profileStats.bestStreak >= 7 && (
+                    <div className="flex items-center gap-2 p-2 bg-orange-50 rounded-lg">
+                      <Flame className="h-4 w-4 text-orange-600" />
+                      <div>
+                        <p className="text-xs font-medium text-orange-800">Streak Master</p>
+                        <p className="text-xs text-orange-600">7+ day streak</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {profileStats.completionRate >= 80 && (
+                    <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg">
+                      <TrendingUp className="h-4 w-4 text-purple-600" />
+                      <div>
+                        <p className="text-xs font-medium text-purple-800">High Achiever</p>
+                        <p className="text-xs text-purple-600">80%+ completion</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Progress towards next achievement */}
+                <div className="pt-2 border-t">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Next Achievement</p>
+                  {profileStats.totalCheckins < 100 ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">Century Club</span>
+                        <span className="text-gray-600">{profileStats.totalCheckins}/100</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div 
+                          className="bg-gradient-to-r from-blue-400 to-blue-600 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${(profileStats.totalCheckins / 100) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-green-600">🎉 All achievements unlocked!</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card className="fade-in-up">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+                Quick Stats
+              </CardTitle>
+              <CardDescription>
+                Your habit journey at a glance
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-lg font-bold text-gray-900">{Math.round(profileStats.completionRate)}%</div>
+                    <div className="text-xs text-gray-600">Success Rate</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded-lg">
+                    <div className="text-lg font-bold text-gray-900">{profileStats.daysSinceJoining}</div>
+                    <div className="text-xs text-gray-600">Days Active</div>
+                  </div>
+                </div>
+                
+                {/* Habit consistency chart placeholder */}
+                <div className="pt-2 border-t">
+                  <p className="text-xs font-medium text-gray-700 mb-2">This Month</p>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 30 }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2 h-2 rounded-sm ${
+                          Math.random() > 0.3 ? 'bg-green-400' : 'bg-gray-200'
+                        }`}
+                        title={`Day ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Daily habit completion</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Preferences Section */}
+      <Card className="fade-in-up">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-purple-600" />
+            Preferences
+          </CardTitle>
+          <CardDescription>
+            Customize your habit tracking experience
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-gray-900 mb-3">Notifications</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
+                    <span className="text-sm text-gray-700">Daily habit reminders</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
+                    <span className="text-sm text-gray-700">Weekly progress reports</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" />
+                    <span className="text-sm text-gray-700">Achievement notifications</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-gray-900 mb-3">Display</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
+                    <span className="text-sm text-gray-700">Show streak animations</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" defaultChecked />
+                    <span className="text-sm text-gray-700">Celebration effects</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-gray-300" />
+                    <span className="text-sm text-gray-700">Compact view mode</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Additional Info */}
-      <Card>
+      <Card className="fade-in-up">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
             Account Information
           </CardTitle>
           <CardDescription>
-            Your account details and preferences
+            Your account details and activity summary
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -463,6 +650,41 @@ export function ProfilePage({ userId }: ProfilePageProps) {
             )}
           </div>
 
+          {/* Data Management Section */}
+          <div className="border-t pt-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-medium text-gray-900 mb-1">Data Management</h3>
+                <p className="text-sm text-gray-500">Export or backup your habit data</p>
+              </div>
+              <Button 
+                variant="outline" 
+                className="button-hover-lift"
+                onClick={() => {
+                  // This would trigger data export functionality
+                  toast.success("Data export feature coming soon! 📊");
+                }}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Export Data
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="font-medium text-blue-800">Habits</div>
+                <div className="text-blue-600">{profileStats?.totalHabits || 0} items</div>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <div className="font-medium text-green-800">Check-ins</div>
+                <div className="text-green-600">{profileStats?.totalCheckins || 0} records</div>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <div className="font-medium text-purple-800">Days Active</div>
+                <div className="text-purple-600">{profileStats?.daysSinceJoining || 0} days</div>
+              </div>
+            </div>
+          </div>
+
           {/* Sign Out Section */}
           <div className="border-t pt-6">
             <div className="flex items-center justify-between">
@@ -472,12 +694,12 @@ export function ProfilePage({ userId }: ProfilePageProps) {
               </div>
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300">
+                  <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 button-hover-lift">
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="modal-slide-in">
                   <DialogHeader>
                     <DialogTitle>Sign Out</DialogTitle>
                     <DialogDescription>
@@ -485,10 +707,10 @@ export function ProfilePage({ userId }: ProfilePageProps) {
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>
-                    <Button variant="outline">Cancel</Button>
+                    <Button variant="outline" className="button-hover-lift">Cancel</Button>
                     <Button 
                       onClick={() => signOut({ callbackUrl: '/home' })}
-                      className="bg-red-600 hover:bg-red-700 text-white"
+                      className="bg-red-600 hover:bg-red-700 text-white button-hover-lift"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       Sign Out

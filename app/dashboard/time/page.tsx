@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { HabitTimeline } from "@/components/habit-timeline";
+import { Calendar, BarChart3 } from "lucide-react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 
 export default function TimePage() {
@@ -79,12 +80,32 @@ export default function TimePage() {
     );
   }
 
+  const getCurrentMonth = () => {
+    return new Date().toLocaleDateString("en-US", { 
+      month: "long", 
+      year: "numeric" 
+    });
+  };
+
   return (
     <DashboardLayout>
-      <div className="py-4">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Timeline</h1>
-          <p className="text-gray-600 text-sm mt-1">Track your habit progress over time</p>
+      <div className="py-4 space-y-6">
+        {/* Beautiful Header Section - matching goals page design */}
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-blue-600/20 blur-3xl rounded-full"></div>
+            <div className="relative">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+                <Calendar className="h-8 w-8 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                Habit Timeline
+              </h1>
+              <p className="text-gray-600 mt-2 max-w-sm mx-auto leading-relaxed">
+                Track your habit progress and patterns for <span className="font-semibold text-green-600">{getCurrentMonth()}</span>
+              </p>
+            </div>
+          </div>
         </div>
         
         {convexUser?._id && (
